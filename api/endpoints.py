@@ -1,4 +1,3 @@
-import calendar
 from collections import Counter
 from datetime import datetime, timedelta
 
@@ -6,6 +5,7 @@ from dateutil.relativedelta import relativedelta
 from flask import Blueprint, jsonify, request
 from sqlalchemy import text
 
+from api.config import MONTH_ID as month_id
 from api.config import get_connection
 
 pendapatan_bp = Blueprint('pendapatan', __name__)
@@ -15,7 +15,7 @@ engine = get_connection()
 def get_default_date(tgl_awal, tgl_akhir):
     if tgl_awal == None:
         tgl_awal = datetime.today() - relativedelta(months=1)
-        tgl_awal = tgl_awal.strftime('%Y-%m-%d')
+        tgl_awal = datetime.strptime(tgl_awal.strftime('%Y-%m-%d'), '%Y-%m-%d')
     else:
         tgl_awal = datetime.strptime(tgl_awal, '%Y-%m-%d')
 
@@ -41,38 +41,48 @@ def tren_pendapatan():
 
     curr_year, prev_year, predict = {}, {}, {}
     for i in range(1, 13):
-        curr_year[calendar.month_name[i]] = 0
-        prev_year[calendar.month_name[i]] = 0
-        predict[calendar.month_name[i]] = 0
+        curr_year[month_id[i]] = 0
+        prev_year[month_id[i]] = 0
+        predict[month_id[i]] = 0
+
+    tren = {}
+    for i in range(1, 13):
+        tren[month_id[i]] = {
+            "tahun_ini": 0,
+            "tahun_sebelumnya": 0,
+            "tahun_selanjutnya": 0,
+            "persentase_tren": None,
+            "persentase_predict": None
+        }
 
     for row in result:
-        curr_m = calendar.month_name[row['TglBKM'].month]
+        curr_m = month_id[row['TglBKM'].month]
         if row['TglBKM'].year == tahun:
-            curr_year[curr_m] = curr_year[curr_m] + row['JmlBayar']
+            tren[curr_m]['tahun_ini'] = round(
+                tren[curr_m]['tahun_ini'] + float(row['JmlBayar']), 2)
         else:
-            prev_year[curr_m] = prev_year[curr_m] + row['JmlBayar']
-        predict[curr_m] = predict[curr_m] + 0
+            tren[curr_m]['tahun_sebelumnya'] = round(
+                tren[curr_m]['tahun_sebelumnya'] + float(row['JmlBayar']), 2)
+        tren[curr_m]['tahun_sebelumnya'] = round(
+            tren[curr_m]['tahun_sebelumnya'] + float(0), 2)
 
     for i in range(1, 13):
-        curr_m = calendar.month_name[i]
-        try:
-            curr_year[curr_m] = {
-                    'total': curr_year[curr_m],
-                    'trend_percent': ((curr_year[curr_m]-prev_year[curr_m])/prev_year[curr_m]) * 100,
-                    'predict_percent': 0.0}
-        except ZeroDivisionError:
-            curr_year[curr_m] = {
-                    'total': curr_year[curr_m],
-                    'trend_percent': (curr_year[curr_m]-prev_year[curr_m]) * 100,
-                    'predict_percent': 0.0}
+        if tren[month_id[i]]['tahun_ini'] == 0 or tren[month_id[i]]['tahun_sebelumnya'] == 0:
+            tren[month_id[i]]['persentase_tren'] = None
+        else:
+            tren[month_id[i]]['persentase_tren'] = round(((tren[month_id[i]]['tahun_ini'] - tren[month_id[i]]['tahun_sebelumnya'])
+                                                          / tren[month_id[i]]['tahun_sebelumnya']) * 100, 2)
+        if tren[month_id[i]]['tahun_ini'] == 0 or tren[month_id[i]]['tahun_selanjutnya'] == 0:
+            tren[month_id[i]]['persentase_predict'] = None
+        else:
+            tren[month_id[i]]['persentase_predict'] = round(((tren[month_id[i]]['tahun_ini'] - tren[month_id[i]]['tahun_selanjutnya'])
+                                                             / tren[month_id[i]]['tahun_selanjutnya']) * 100, 2)
 
     data = {
-        "tahun": tahun,
-        "total_tahun_ini": curr_year,
-        "total_tahun_sebelumnya": prev_year,
-        "total_prediksi": predict,
         "judul": "Tren Pendapatan",
-        "label": 'Pendapatan'
+        "label": 'Pendapatan',
+        "tahun": tahun,
+        "tren": tren
     }
     return jsonify(data)
 
@@ -104,8 +114,15 @@ def pendapatan_instalasi():
         })
     cnt = Counter()
     for i in range(len(data)):
-        cnt[data[i]['instalasi']] += data[i]['total']
-    return jsonify(cnt)
+        cnt[data[i]['instalasi'].lower().replace(' ', '_')] += float(data[i]['total'])
+
+    result = {
+        "judul": 'Pendapatan Instalasi',
+        "label": 'Pendapatan',
+        "instalasi": cnt,
+        "tgl_filter": {"tgl_awal": tgl_awal, "tgl_akhir": tgl_akhir}
+    }
+    return jsonify(result)
 
 
 @pendapatan_bp.route('/pendapatan_kelas')
@@ -135,9 +152,15 @@ def pendapatan_kelas():
         })
     cnt = Counter()
     for i in range(len(data)):
-        cnt[data[i]['kelas']] += data[i]['total']
-    return jsonify(cnt)
+        cnt[data[i]['kelas'].lower().replace(' ', '_')] += float(data[i]['total'])
 
+    result = {
+        "judul": 'Pendapatan Kelas',
+        "label": 'Pendapatan',
+        "kelas": cnt,
+        "tgl_filter": {"tgl_awal": tgl_awal, "tgl_akhir": tgl_akhir}
+    }
+    return jsonify(result)
 
 
 @pendapatan_bp.route('/pendapatan_produk')
@@ -170,10 +193,12 @@ def pendapatan_cara_bayar():
         })
     cnt = Counter()
     for i in range(len(data)):
-        cnt[data[i]['cara_bayar']] += data[i]['total']
-    return jsonify(cnt)
+        cnt[data[i]['cara_bayar'].lower().replace(' ', '_')] += float(data[i]['total'])
 
-#  Counter
-    # cnt = Counter()
-    # for i in range(len(data)):
-    #     cnt[data[i]['cara_bayar']] += 1
+    result = {
+        "judul": 'Pendapatan Cara Bayar',
+        "label": 'Pendapatan',
+        "cara_bayar": cnt,
+        "tgl_filter": {"tgl_awal": tgl_awal, "tgl_akhir": tgl_akhir}
+    }
+    return jsonify(result)
