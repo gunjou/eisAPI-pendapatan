@@ -39,12 +39,6 @@ def tren_pendapatan():
             OR datepart(year,[TglBKM]) = {tahun}
             ORDER BY sbkm.TglBKM ASC;"""))
 
-    curr_year, prev_year, predict = {}, {}, {}
-    for i in range(1, 13):
-        curr_year[month_id[i]] = 0
-        prev_year[month_id[i]] = 0
-        predict[month_id[i]] = 0
-
     tren = {}
     for i in range(1, 13):
         tren[month_id[i]] = {
@@ -63,8 +57,8 @@ def tren_pendapatan():
         else:
             tren[curr_m]['tahun_sebelumnya'] = round(
                 tren[curr_m]['tahun_sebelumnya'] + float(row['JmlBayar']), 2)
-        tren[curr_m]['tahun_sebelumnya'] = round(
-            tren[curr_m]['tahun_sebelumnya'] + float(0), 2)
+        tren[curr_m]['tahun_selanjutnya'] = round(
+            tren[curr_m]['tahun_selanjutnya'] + float(0), 2)
 
     for i in range(1, 13):
         if tren[month_id[i]]['tahun_ini'] == 0 or tren[month_id[i]]['tahun_sebelumnya'] == 0:
@@ -165,7 +159,38 @@ def pendapatan_kelas():
 
 @pendapatan_bp.route('/pendapatan_produk')
 def pendapatan_produk():
-    return jsonify({'response': 'ini data pendapatan jenis produk'})
+    tgl_awal = request.args.get('tgl_awal')
+    tgl_akhir = request.args.get('tgl_akhir')
+    tgl_awal, tgl_akhir = get_default_date(tgl_awal, tgl_akhir)
+    result = engine.execute(
+        text(
+            f"""SELECT evprsna.TanggalPelayanan, evprsna.Tarif, jp.Deskripsi
+            FROM dbo.EIS_ViewPendapatanRumahSakitNewAll evprsna
+            INNER JOIN dbo.ListPelayananRS lpr 
+            ON evprsna.KdPelayananRS = lpr.KdPelayananRS 
+            INNER JOIN dbo.JenisPelayanan jp 
+            ON lpr.KdJnsPelayanan = jp.KdJnsPelayanan 
+            WHERE evprsna.TanggalPelayanan >= '{tgl_awal}'
+            AND evprsna.TanggalPelayanan < '{tgl_akhir + timedelta(days=1)}'
+            ORDER BY evprsna.TanggalPelayanan ASC;"""))
+    data = []
+    for row in result:
+        data.append({
+            "tanggal": row['TanggalPelayanan'],
+            "jenis_pelayanan": row['Deskripsi'],
+            "total": row['Tarif']
+        })
+    cnt = Counter()
+    for i in range(len(data)):
+        cnt[data[i]['jenis_pelayanan'].lower().replace(' ', '_')] += float(data[i]['total'])
+
+    result = {
+        "judul": 'Pendapatan Jenis Produk',
+        "label": 'Pendapatan',
+        "cara_bayar": cnt,
+        "tgl_filter": {"tgl_awal": tgl_awal, "tgl_akhir": tgl_akhir}
+    }
+    return jsonify(result)
 
 
 @pendapatan_bp.route('/pendapatan_cara_bayar')
