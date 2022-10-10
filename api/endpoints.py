@@ -27,7 +27,7 @@ def get_default_date(tgl_awal, tgl_akhir):
     return tgl_awal, tgl_akhir
 
 
-@pendapatan_bp.route('/tren_pendapatan')
+@pendapatan_bp.route('/pendapatan/tren_pendapatan')
 def tren_pendapatan():
     tgl_awal = request.args.get('tgl_awal')
     tahun = datetime.now().year if tgl_awal == None else int(tgl_awal[:4])
@@ -81,7 +81,7 @@ def tren_pendapatan():
     return jsonify(data)
 
 
-@pendapatan_bp.route('/pendapatan_instalasi')
+@pendapatan_bp.route('/pendapatan/pendapatan_instalasi')
 def pendapatan_instalasi():
     tgl_awal = request.args.get('tgl_awal')
     tgl_akhir = request.args.get('tgl_akhir')
@@ -119,7 +119,7 @@ def pendapatan_instalasi():
     return jsonify(result)
 
 
-@pendapatan_bp.route('/pendapatan_kelas')
+@pendapatan_bp.route('/pendapatan/pendapatan_kelas')
 def pendapatan_kelas():
     tgl_awal = request.args.get('tgl_awal')
     tgl_akhir = request.args.get('tgl_akhir')
@@ -157,7 +157,7 @@ def pendapatan_kelas():
     return jsonify(result)
 
 
-@pendapatan_bp.route('/pendapatan_produk')
+@pendapatan_bp.route('/pendapatan/pendapatan_produk')
 def pendapatan_produk():
     tgl_awal = request.args.get('tgl_awal')
     tgl_akhir = request.args.get('tgl_akhir')
@@ -193,7 +193,7 @@ def pendapatan_produk():
     return jsonify(result)
 
 
-@pendapatan_bp.route('/pendapatan_cara_bayar')
+@pendapatan_bp.route('/pendapatan/pendapatan_cara_bayar')
 def pendapatan_cara_bayar():
     tgl_awal = request.args.get('tgl_awal')
     tgl_akhir = request.args.get('tgl_akhir')
