@@ -5,11 +5,9 @@ from dateutil.relativedelta import relativedelta
 from flask import Blueprint, jsonify, request
 
 from api.config import MONTH_ID as month_id
-from api.config import get_connection
 from api.query import *
 
 pendapatan_bp = Blueprint('pendapatan', __name__)
-engine = get_connection()
 
 
 def get_default_date(tgl_awal, tgl_akhir):
